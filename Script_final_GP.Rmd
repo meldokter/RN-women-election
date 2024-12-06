@@ -1,0 +1,568 @@
+---
+title: "Script Trabalho Final"
+author: "Mel Dokter Palomo - 12507543 - graduação - noturno"
+date: "2024-12-02"
+output: pdf_document
+---
+
+# 1. Importando os bancos de dados
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+#Banco 2020-2016 (variáveis marcadores sociais)
+library(readxl)
+dfM <- read_excel("~/Downloads/TSE_RN_Prefeitos.xlsx")
+
+#Banco 2020-2000 
+library(readxl)
+TSERNHIST <- read_excel("~/Downloads/SérieHistóricaTSERN.xlsx")
+```
+
+# 2. Estatísticas descritivas
+
+## 2.1 Gênero série histórica (2000-2020)
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)  
+
+# Criar a tabela de números brutos e porcentagens
+tabela_genero_ano <- TSERNHIST %>%
+  filter(CD_GENERO %in% c(2, 4)) %>%  
+  group_by(ANO_ELEICAO, CD_GENERO) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(ANO_ELEICAO) %>%
+  mutate(percentual = n / sum(n) * 100) %>%
+  ungroup() %>%
+  mutate(
+    CD_GENERO = recode(CD_GENERO, `2` = "Masculino", `4` = "Feminino")
+  ) %>%
+  arrange(ANO_ELEICAO, desc(CD_GENERO))
+
+# Mostrar a tabela formatada
+kable(
+  tabela_genero_ano,
+  col.names = c("Ano da Eleição", "Gênero", "Número de Candidatos", "Porcentagem (%)"),
+  format = "markdown"
+)
+```
+
+```{r Gênero hist, echo=TRUE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(scales) 
+library(dplyr)
+
+TSERNHIST <- TSERNHIST %>% filter(CD_GENERO != 0)
+
+ggplot(TSERNHIST, aes(x = as.factor(CD_GENERO), fill = as.factor(ANO_ELEICAO))) +
+  geom_bar(aes(y = (..count..) / sum(..count..)), position = "dodge") +  
+  scale_x_discrete(labels = c("2" = "Masculino", "4" = "Feminino")) +  
+  scale_y_continuous(labels = percent_format()) +  
+  scale_fill_manual(
+    values = c("2000" = "#D8BFD8", "2004" = "#BA55D3", 
+               "2008" = "#8A2BE2", "2012" = "#4B0082",
+               "2016" = "#7B68EE", "2020" = "#9400D3"),
+    name = "Ano da Eleição"
+  ) +  
+  labs(title = "Distribuição de Gênero por Ano (2000-2020)", 
+       x = "Gênero", 
+       y = "Porcentagem", 
+       fill = "Ano da Eleição") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+## 2.2 Gênero no banco de interesse
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)  
+
+# Criar a tabela de números brutos e porcentagens
+tabela_genero_ano2 <- dfM %>%
+  filter(CD_GENERO %in% c(2, 4)) %>%  
+  group_by(ANO_ELEICAO, CD_GENERO) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(ANO_ELEICAO) %>%
+  mutate(percentual = n / sum(n) * 100) %>%
+  ungroup() %>%
+  mutate(
+    CD_GENERO = recode(CD_GENERO, `2` = "Masculino", `4` = "Feminino")
+  ) %>%
+  arrange(ANO_ELEICAO, desc(CD_GENERO))
+
+# Mostrar a tabela formatada
+kable(
+  tabela_genero_ano2,
+  col.names = c("Ano da Eleição", "Gênero", "Número de Candidatos", "Porcentagem (%)"),
+  format = "markdown"
+)
+```
+
+```{r gênero interesse, echo=TRUE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(scales)
+
+ggplot(dfM, aes(x = as.factor(CD_GENERO), fill = as.factor(ANO_ELEICAO))) +
+  geom_bar(aes(y = (..count..) / sum(..count..)), position = "dodge") +  
+  scale_x_discrete(labels = c("2" = "Masculino", "4" = "Feminino")) +  
+  scale_y_continuous(labels = percent) +  
+  scale_fill_manual(values = c("2020" = "darkseagreen3", "2016" = "darkmagenta")) +  
+  labs(title = "Distribuição de Gênero por Ano", x = "Gênero", 
+       y = "Porcentagem", fill = "ANO_ELEICAO") +
+  theme_minimal()
+```
+
+## 2.3 Raça
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)
+
+# Criar a tabela
+tabela_raca <- dfM %>%
+  group_by(ANO_ELEICAO, CD_GENERO, CD_COR_RACA) %>%
+  summarise(
+    count = n(),
+    .groups = 'drop'
+  ) %>%
+  group_by(ANO_ELEICAO) %>%
+  mutate(
+    percent = count / sum(count) * 100
+  ) %>%
+  ungroup() %>%
+  mutate(
+    raca = case_when(
+      CD_COR_RACA == 1 ~ "Branca",
+      CD_COR_RACA == 2 ~ "Preta",
+      CD_COR_RACA == 3 ~ "Parda",
+      CD_COR_RACA == 4 ~ "Amarela",
+      CD_COR_RACA == 5 ~ "Indígena",
+      CD_COR_RACA == 6 ~ "NA",
+      TRUE ~ "Outros"
+    ),
+    genero = case_when(
+      CD_GENERO == 2 ~ "Masculino",
+      CD_GENERO == 4 ~ "Feminino",
+      TRUE ~ "Outro"
+    )
+  ) %>%
+  select(ANO_ELEICAO, genero, raca, count, percent) %>%
+  arrange(ANO_ELEICAO, genero, raca)
+
+# Mostrar a tabela formatada
+kable(
+  tabela_raca,
+  col.names = c("Ano da Eleição", "Gênero", "Raça", "Número de Candidatos", "Porcentagem (%)"),
+  format = "markdown"
+)
+```
+
+```{r raçå, echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(dfM, aes(x = as.factor(CD_COR_RACA), fill = as.factor(ANO_ELEICAO))) +
+  geom_bar(
+    aes(y = ..count.. / sum(..count..)),
+    position = "dodge"
+  ) +  
+  scale_x_discrete(labels = c(
+    "1" = "Branca", "2" = "Preta", 
+    "3" = "Parda", "4" = "Amarela", 
+    "5" = "Indígena", "6" = "NA"
+  )) +  
+  scale_y_continuous(labels = scales::percent_format()) +  
+  scale_fill_manual(values = c("2020" = "darkseagreen3", "2016" = "darkmagenta")) +  
+  labs(
+    title = "Distribuição da Raça por Ano e Gênero", 
+    x = "Raça", 
+    y = "Porcentagem", 
+    fill = "Ano"
+  ) +
+  facet_wrap(~as.factor(CD_GENERO), labeller = as_labeller(c("2" = "Masculino", "4" = "Feminino"))) +  
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  
+  )
+```
+
+## 2.4 Instrução
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Criar a tabela com CD_GRAU_INSTRUCAO
+tabela_instrucao <- dfM %>%
+  group_by(ANO_ELEICAO, CD_GENERO, CD_GRAU_INSTRUCAO) %>%
+  summarise(
+    count = n(),
+    .groups = 'drop'
+  ) %>%
+  group_by(ANO_ELEICAO) %>%
+  mutate(
+    percent = count / sum(count) * 100
+  ) %>%
+  ungroup() %>%
+  mutate(
+    grau_instrucao = case_when(
+      CD_GRAU_INSTRUCAO == 1 ~ "Analfabeto",
+      CD_GRAU_INSTRUCAO == 2 ~ "Lê e escreve",
+      CD_GRAU_INSTRUCAO == 3 ~ "EF inc",
+      CD_GRAU_INSTRUCAO == 4 ~ "EF comp",
+      CD_GRAU_INSTRUCAO == 5 ~ "EM inc",
+      CD_GRAU_INSTRUCAO == 6 ~ "EM comp",
+      CD_GRAU_INSTRUCAO == 7 ~ "ES inc",
+      CD_GRAU_INSTRUCAO == 8 ~ "ES comp",
+      TRUE ~ "Outro"
+    ),
+    genero = case_when(
+      CD_GENERO == 2 ~ "Masculino",
+      CD_GENERO == 4 ~ "Feminino",
+      TRUE ~ "Outro"
+    )
+  ) %>%
+  select(ANO_ELEICAO, genero, grau_instrucao, count, percent) %>%
+  arrange(ANO_ELEICAO, genero, grau_instrucao)
+
+# Mostrar a tabela formatada
+kable(
+  tabela_instrucao,
+  col.names = c("Ano da Eleição", "Gênero", "Grau de Instrução", "Número de Candidatos", "Porcentagem (%)"),
+  format = "markdown"
+)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(dfM, aes(x = as.factor(CD_GRAU_INSTRUCAO), fill = as.factor(ANO_ELEICAO))) +
+  geom_bar(
+    aes(y = ..count.. / tapply(..count.., list(..x.., ..PANEL..), sum)[interaction(..x.., ..PANEL..)]),
+    position = "dodge"
+  ) +
+  scale_x_discrete(labels = c(
+    "1" = "Analfabeto", "2" = "Lê e escreve", 
+    "3" = "EF inc", "4" = "EF comp", 
+    "5" = "EM inc", "6" = "EM comp", 
+    "7" = "ES inc", "8" = "ES comp"
+  )) +
+  scale_y_continuous(labels = percent) +
+  scale_fill_manual(values = c("2020" = "darkseagreen3", "2016" = "darkmagenta")) +
+  labs(
+    title = "Distribuição de Grau de Instrução por Ano e Gênero",
+    x = "Grau de Instrução",
+    y = "Porcentagem",
+    fill = "Ano"
+  ) +
+  facet_wrap(~as.factor(CD_GENERO), labeller = as_labeller(c("2" = "Masculino", "4" = "Feminino"))) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  
+  )
+```
+
+## 2.5 Estado Civil
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Criar a tabela com estado civil
+tabela_estado_civil <- dfM %>%
+  group_by(ANO_ELEICAO, CD_GENERO, CD_ESTADO_CIVIL) %>%
+  summarise(
+    count = n(),
+    .groups = 'drop'
+  ) %>%
+  group_by(ANO_ELEICAO) %>%
+  mutate(
+    percent = count / sum(count) * 100
+  ) %>%
+  ungroup() %>%
+  mutate(
+    estado_civil = case_when(
+      CD_ESTADO_CIVIL == 1 ~ "Solteiro(a)",
+      CD_ESTADO_CIVIL == 3 ~ "Casado(a)",
+      CD_ESTADO_CIVIL == 5 ~ "Viúvo(a)",
+      CD_ESTADO_CIVIL == 7 ~ "Separado(a)",
+      CD_ESTADO_CIVIL == 9 ~ "Divorciado(a)",
+      TRUE ~ "Outro"
+    ),
+    genero = case_when(
+      CD_GENERO == 2 ~ "Masculino",
+      CD_GENERO == 4 ~ "Feminino",
+      TRUE ~ "Outro"
+    )
+  ) %>%
+  select(ANO_ELEICAO, genero, estado_civil, count, percent) %>%
+  arrange(ANO_ELEICAO, genero, estado_civil)
+
+# Mostrar a tabela formatada
+kable(
+  tabela_estado_civil,
+  col.names = c("Ano da Eleição", "Gênero", "Estado Civil", "Número de Candidatos", "Porcentagem (%)"),
+  format = "markdown"
+)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+library(scales)
+
+ggplot(dfM, aes(x = estado_civil, fill = as.factor(ANO_ELEICAO))) +
+  geom_bar(
+    aes(y = ..count.. / tapply(..count.., list(..x.., ..PANEL..), sum)[interaction(..x.., ..PANEL..)]),
+    position = "dodge"
+  ) +
+  scale_x_discrete(labels = c(
+    "Solteiro(a)", "Casado(a)", "Viúvo(a)", "Separado(a)", "Divorciado(a)", "Outro"
+  )) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = c("2020" = "darkseagreen3", "2016" = "darkmagenta")) +
+  labs(
+    title = "Distribuição de Estado Civil por Ano e Gênero",
+    x = "Estado Civil",
+    y = "Porcentagem",
+    fill = "Ano"
+  ) +
+  facet_wrap(~genero, labeller = as_labeller(c(
+    "Masculino" = "Masculino", 
+    "Feminino" = "Feminino", 
+    "Outro" = "Outro"
+  ))) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  
+  )
+```
+
+## 2.6 Eleitos e não eleitos por ano
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)
+
+# Criar a tabela com contagem e porcentagem por ano
+tabela_distribuicao_ano <- dfM %>%
+  group_by(ANO_ELEICAO, CD_GENERO, CD_SIT_TOT) %>%
+  summarise(Contagem = n(), .groups = "drop") %>%
+  mutate(
+    Percentual = Contagem / sum(Contagem[ANO_ELEICAO == first(ANO_ELEICAO)]) * 100
+  ) %>%
+  arrange(ANO_ELEICAO, CD_GENERO, CD_SIT_TOT) %>%
+  mutate(
+    CD_GENERO = recode(CD_GENERO, "2" = "Masculino", "4" = "Feminino"),
+    CD_SIT_TOT = recode(CD_SIT_TOT, "0" = "Não Eleitos", "1" = "Eleitos")
+  )
+
+# Exibir a tabela em Markdown
+kable(
+  tabela_distribuicao_ano,
+  col.names = c("Ano", "Gênero", "Situação", "Contagem", "Percentual (%)"),
+  format = "markdown"
+)
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(ggplot2)
+
+# Criar o histograma agrupado por gênero
+ggplot(dfM, aes(x = as.factor(CD_SIT_TOT), fill = as.factor(CD_GENERO))) +
+  geom_bar(position = "dodge") +
+  scale_x_discrete(labels = c("0" = "Não Eleitos", "1" = "Eleitos")) +
+  scale_fill_manual(
+    values = c("2" = "darkseagreen3", "4" = "darkmagenta"),
+    labels = c("2" = "Masculino", "4" = "Feminino"),
+    name = "Gênero"
+  ) +
+  labs(
+    title = "Distribuição de Candidatos Eleitos e Não Eleitos por Gênero",
+    x = "Situação",
+    y = "Contagem"
+  ) +
+  facet_wrap(~CD_GENERO, labeller = as_labeller(c("2" = "Masculino", "4" = "Feminino"))) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+# 3. Regressão logística
+
+## 3.1 Criação das variáveis dummy
+
+### 3.1.1 Raça
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Criar a variável dummy para raça
+dfM <- dfM %>%
+  mutate(
+    raca_dummy = case_when(
+      CD_COR_RACA == 1 ~ 0, # Brancos
+      CD_COR_RACA %in% c(2, 3, 5) ~ 1, # Preta, Parda, Indígena
+      is.na(CD_COR_RACA) ~ 1, # NA considerado como não branco
+      TRUE ~ 1 # Qualquer outro valor tratado como não branco
+    )
+  )
+
+table(dfM$raca_dummy)
+```
+
+### 3.1.2 Grau de Instrução
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Criar a variável dummy para grau de instrução
+dfM <- dfM %>%
+  mutate(
+    instrucao_dummy = case_when(
+      CD_GRAU_INSTRUCAO %in% c(7, 8) ~ 0, # Ensino superior (ES inc e ES comp)
+      TRUE ~ 1 # Todo o restante é considerado sem ensino superior
+    )
+  )
+
+table(dfM$instrucao_dummy)
+```
+
+### 3.1.3 Estado-Civil
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Criar a variável dummy para estado civil
+dfM <- dfM %>%
+  mutate(
+    estado_civil_dummy = case_when(
+      CD_ESTADO_CIVIL == 3 ~ 0, # Casados
+      TRUE ~ 1 # Todo o restante
+    )
+  )
+
+table(dfM$estado_civil_dummy)
+```
+
+## 3.2 Efeito do gênero nas chances de eleição
+
+### 3.2.1 Rodando o modelo
+
+```{r Reg 1, echo=TRUE, message=FALSE, warning=FALSE}
+
+reggen <- glm(CD_SIT_TOT ~ CD_GENERO, family = binomial, 
+                   data = dfM)
+summary(reggen)
+```
+
+#### 3.2.1.1 Categorias de referência:
+
+CD_SIT_TOT - 0 = Não eleito
+
+CD_GENERO - 2 = Masculino
+
+### 3.2.2 Calculando a odds-ratio
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+exp(coef(reggen))
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(stargazer)
+stargazer(reggen, nobs = T, type = "text")
+```
+
+### 3.2.3 Distribuição das probabilidades
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+hist(reggen$fitted.values)
+```
+
+### 3.2.4 Log Likelihood
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+logLik(reggen)
+```
+
+### 3.2.5 Resumo dos efeitos do modelo
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Extrair coeficientes estimados
+coef_estimatesgen <- summary(reggen)$coefficients
+
+# Calcular as razões de chance
+odds_ratiosgen <- exp(coef_estimatesgen[, "Estimate"])
+
+# Calcular o aumento percentual
+percent_changegen <- (odds_ratiosgen - 1) * 100
+
+# Exibir os resultados em tabela
+resultadosgen <- data.frame(
+  Variável = rownames(coef_estimatesgen),
+  Coeficiente = coef_estimatesgen[, "Estimate"],
+  Razão_de_Chance = odds_ratiosgen,
+  Aumento_Percentual = percent_changegen
+)
+
+print(resultadosgen)
+```
+
+## 3.3 Efeito dos marcadores sociais na eleição de mulheres
+
+### 3.3.1 Selecionando apenas as mulheres do banco de dados
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+dfSM <- dfM %>%
+  filter(CD_GENERO == 4)
+```
+
+### 3.3.2 Rodando o modelo
+
+```{r reg2, echo=TRUE, message=FALSE, warning=FALSE}
+#as.factor(dfSM$raca_dummy)
+#as.factor(dfSM$instrucao_dummy)
+#as.factor(dfSM$estado_civil_dummy)
+
+regmarc <- glm(CD_SIT_TOT ~ raca_dummy + instrucao_dummy + estado_civil_dummy, family = binomial, data=dfSM)
+
+summary(regmarc)
+```
+
+#### 3.3.2.1 Categorias de referência
+
+CD_SIT_TOT - 0 = Não eleitos
+
+raca_dummy - 0 = Brancos
+
+instrucao_dummy - 0 = Tem ES
+
+estado_civil_dummy - 0 = Casados
+
+### 3.3.3 Calculando a odds-ratio
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+exp(coef(regmarc))
+```
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(stargazer)
+stargazer(regmarc, nobs = T, type = "text")
+```
+
+### 3.3.4 Distribuição de probabilidade
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+hist(regmarc$fitted.values)
+```
+
+### 3.3.5 Log Likelihood
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+logLik(regmarc)
+```
+
+### 3.3.6 Resumo dos efeitos do modelo
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+# Extrair coeficientes estimados
+coef_estimatesmarc <- summary(regmarc)$coefficients
+
+# Calcular as razões de chance
+odds_ratiosmarc <- exp(coef_estimatesmarc[, "Estimate"])
+
+# Calcular o aumento percentual
+percent_changemarc <- (odds_ratiosmarc - 1) * 100
+
+# Exibir os resultados em tabela
+resultadosmarc <- data.frame(
+  Variável = rownames(coef_estimatesmarc),
+  Coeficiente = coef_estimatesmarc[, "Estimate"],
+  Razão_de_Chance = odds_ratiosmarc,
+  Aumento_Percentual = percent_changemarc
+)
+
+print(resultadosmarc)
+```
